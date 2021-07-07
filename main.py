@@ -3,6 +3,9 @@ from aux_functions import *
 from configs.read_cfg import read_cfg
 import importlib, json
 from unreal_envs.initial_positions import *
+from airsim.types import YawMode
+import math
+import numpy as np
 # from aux_functions import *
 # TF Debug message suppressed
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -122,6 +125,31 @@ def getObservation(client : airsim.MultirotorClient):
         
         
         return observation
+
+
+def do_action(action):
+    
+    
+    # action[0] = min(max(action[0], 1.5), -1.5)
+    # action[1] = min(max(action[1], 0.5), -0.5)
+    # action[2] = min(max(action[2], 0.5), -0.5)
+    # action[3] = min(max(action[3], 0.5), -0.5)
+    # action *= 0.5
+    VX_vehicle =  action[0]
+    VY_vehicle = action[1] 
+    VZ_world =  action[2]
+    yaw = action[3]
+
+    VX_world = VX_vehicle * np.cos(yaw) - VY_vehicle * np.sin(yaw)
+    VY_world = VX_vehicle * np.sin(yaw) + VY_vehicle * np.cos(yaw)
+
+
+    # print(VX_vehicle, VY_vehicle, VZ_world, action)
+
+
+    client.moveByVelocityAsync(VX_world, VY_world, VZ_world, 1)# yaw_mode= YawMode(True,  (action[3] )*180/3.14), drivetrain=DrivetrainType.MaxDegreeOfFreedom).join()
+    # self.drone.moveByVelocityAsync(VX_vehicle , VY_vehicle, VZ_world , 0.01, yaw_mode= YawMode(False,  Vyaw), drivetrain=DrivetrainType.ForwardOnly)
+
 if __name__ == '__main__':
     # Read the config file
     cfg = read_cfg(config_filename='configs/config.cfg', verbose=True)
@@ -141,6 +169,8 @@ if __name__ == '__main__':
             env_process, env_folder = start_environment(env_name=cfg.env_name)
             client, old_posit, initZ = connect_drone()
             val = 1
+            angle = 0
+            ya = YawMode()
             while True:
                 # client.moveByVelocityZAsync(0.01, 0, 0, 0.01)
                 # obs = getObservation(client)
@@ -156,26 +186,35 @@ if __name__ == '__main__':
                 elif k == ord('j'):
                     client.moveByVelocityAsync(0.0, 0, -val, 1)
                 elif k == ord('w'):
-                    client.moveByVelocityAsync(val, 0, 0.0, 1)
+                    action = [val,0,0,angle*math.pi/180]
+                    do_action(action)
+                    
                 elif k == ord('s'):
-                    client.moveByVelocityAsync(-val, 0, 0.0,  1)
+                    action = [-val,0,0,angle*math.pi/180]
+                    do_action(action)
+                    # client.moveByVelocityAsync(-val, 0, 0.0,  1)
                 elif k == ord('a'):
-                    client.moveByVelocityAsync(0.0, val, 0.0, 1)
+                    action = [0,-val,0,angle*math.pi/180]
+                    do_action(action)
+                    # client.moveByVelocityAsync(0.0, val, 0.0, 1)
                 elif k == ord('d'):
-                    client.moveByVelocityAsync(0.0, -val, 0.0,  1)
+                    action = [0,+val,0,angle*math.pi/180]
+                    do_action(action)
+                    # client.moveByVelocityAsync(0.0, val, 0.0,  1)
                 elif k == ord('e'):
-                    # client.rotateToYawAsync(90.,3e+38,1)
-                    # client.rotateToYawAsync(45, timeout_sec=3e+38, margin=5)
-                    # client.rotateByYawRateAsync(20, 1)#, vehicle_name='')
-                    from airsim.types import YawMode
-                    ya = YawMode()
+                    degrees = 20
                     ya.is_rate = False
-                    ya.yaw_or_rate=90
-                    client.moveByVelocityAsync(0.0, 0.0, 0.0,  3, drivetrain=1,yaw_mode=ya)
+                    ya.yaw_or_rate+=20
+                    angle+=20
+                    client.moveByVelocityAsync(0.0, 0.0, 0.0,  3, drivetrain=0,yaw_mode=ya)
+                elif k == ord('q'):
+                    angle-=20
+                    ya.is_rate = False
+                    ya.yaw_or_rate-=20
+                    client.moveByVelocityAsync(0.0, 0.0, 0.0,  3, drivetrain=0,yaw_mode=ya)
 
         except Exception as e:
 
             print(e)
             close_env(env_process)
             print("Closed environment")
-
