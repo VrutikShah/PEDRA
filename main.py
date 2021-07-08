@@ -6,6 +6,8 @@ from unreal_envs.initial_positions import *
 from airsim.types import YawMode
 import math
 import numpy as np
+import pickle
+import csv
 # from aux_functions import *
 # TF Debug message suppressed
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -147,8 +149,8 @@ def do_action(action):
     # print(VX_vehicle, VY_vehicle, VZ_world, action)
 
 
-    client.moveByVelocityAsync(VX_world, VY_world, VZ_world, 1)# yaw_mode= YawMode(True,  (action[3] )*180/3.14), drivetrain=DrivetrainType.MaxDegreeOfFreedom).join()
-    # self.drone.moveByVelocityAsync(VX_vehicle , VY_vehicle, VZ_world , 0.01, yaw_mode= YawMode(False,  Vyaw), drivetrain=DrivetrainType.ForwardOnly)
+    client.moveByVelocityAsync(VX_world, VY_world, VZ_world, 1)
+    
 
 if __name__ == '__main__':
     # Read the config file
@@ -168,50 +170,83 @@ if __name__ == '__main__':
         try:
             env_process, env_folder = start_environment(env_name=cfg.env_name)
             client, old_posit, initZ = connect_drone()
+            vx,vy,vz,angle = 0,0,0,0
             val = 1
-            angle = 0
+            dataset = []
+            count = 0
             ya = YawMode()
+            to_record = False
+            yaw_rate = 25
+
             while True:
                 # client.moveByVelocityZAsync(0.01, 0, 0, 0.01)
                 # obs = getObservation(client)
                 image = get_MonocularImageRGB(client, name)
+
+                count+=1
                 cv2.imshow('a', image)
                 k  = cv2.waitKey(1)
+                if k == ord('r'):
+                    to_record = not to_record
+                if to_record:
+                    if count%10==0:
+                        # to save
+                        imname = 'img' + str(count//10) + '.jpg'
+                        cv2.imwrite('dataset/'+imname,image)
+                        dic = [vx,vy,vz,angle]
+                        dataset.append(dic)
+
                 # time.sleep(0.5)
                 if k == ord('o'):
+                    # with open('dataset_dict', 'wb') as handle:
+                    #     pickle.dump(dataset, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                    if to_record:
+                        with open('vel_data.csv', 'w') as f:
+                            fields = ['vx', 'vy', 'vz', 'yaw'] 
+                            write = csv.writer(f)            
+                            write.writerow(fields)
+                            write.writerows(dataset)
                     close_env(env_process)
                     exit()
                 elif k == ord('i'):
-                    client.moveByVelocityAsync(0.0, 0, val, 1)
+                    client.moveByVelocityAsync(0, 0, vz+val, 1)
+                    vx,vy,vz= 0,0,val+vz
                 elif k == ord('j'):
-                    client.moveByVelocityAsync(0.0, 0, -val, 1)
+                    client.moveByVelocityAsync(0, 0, vz-val, 1)
+                    vx,vy,vz= 0,0,-val+vz
+
                 elif k == ord('w'):
-                    action = [val,0,0,angle*math.pi/180]
+                    vx,vy,vz= val+vx,vy,0
+                    action = [vx,vy,vz,-angle*math.pi/180]
                     do_action(action)
                     
                 elif k == ord('s'):
-                    action = [-val,0,0,angle*math.pi/180]
+                    vx,vy,vz= -val+vx,vy,0
+                    action = [vx,vy,vz,-angle*math.pi/180]
                     do_action(action)
                     # client.moveByVelocityAsync(-val, 0, 0.0,  1)
                 elif k == ord('a'):
-                    action = [0,-val,0,angle*math.pi/180]
+                    vx,vy,vz= vx,-val+vy,0
+                    action = [vx,vy,vz,angle*math.pi/180]
                     do_action(action)
                     # client.moveByVelocityAsync(0.0, val, 0.0, 1)
                 elif k == ord('d'):
-                    action = [0,+val,0,angle*math.pi/180]
+                    vx,vy,vz= vx,val+vy,0
+                    action = [vx,vy,vz,angle*math.pi/180]
                     do_action(action)
                     # client.moveByVelocityAsync(0.0, val, 0.0,  1)
                 elif k == ord('e'):
-                    degrees = 20
+                    # degrees = 20
                     ya.is_rate = False
-                    ya.yaw_or_rate+=20
-                    angle+=20
-                    client.moveByVelocityAsync(0.0, 0.0, 0.0,  3, drivetrain=0,yaw_mode=ya)
+                    ya.yaw_or_rate+=yaw_rate
+                    client.moveByVelocityAsync(vx, vy, 0.0,  1, drivetrain=0,yaw_mode=ya)
+                    angle+=yaw_rate
                 elif k == ord('q'):
-                    angle-=20
+                    # angle-=20
                     ya.is_rate = False
-                    ya.yaw_or_rate-=20
-                    client.moveByVelocityAsync(0.0, 0.0, 0.0,  3, drivetrain=0,yaw_mode=ya)
+                    ya.yaw_or_rate-=yaw_rate
+                    client.moveByVelocityAsync(0.0, 0.0, 0.0,  1, drivetrain=0,yaw_mode=ya)
+                    angle+=yaw_rate
 
         except Exception as e:
 
