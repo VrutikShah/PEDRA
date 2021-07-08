@@ -2,6 +2,8 @@
 *.npy
 *.pyc
 *.xml
+*.jpg
+*.png
 .idea/
 models/
 unreal_envs/*/

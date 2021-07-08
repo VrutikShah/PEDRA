@@ -3,7 +3,7 @@ from aux_functions import *
 from configs.read_cfg import read_cfg
 import importlib, json
 from unreal_envs.initial_positions import *
-from airsim.types import YawMode
+from airsim.types import YawMode, Quaternionr
 import math
 import numpy as np
 import pickle
@@ -152,6 +152,12 @@ def do_action(action):
     client.moveByVelocityAsync(VX_world, VY_world, VZ_world, 1)
     
 
+def getEuler(quat):
+    # print(quat)
+    w,x,y,z = quat.w_val,quat.x_val,quat.y_val,quat.z_val
+    yaw = math.atan2(2*(w*z+x*y),1-2*(y**2+z**2))
+    return yaw*180/math.pi
+
 if __name__ == '__main__':
     # Read the config file
     cfg = read_cfg(config_filename='configs/config.cfg', verbose=True)
@@ -171,18 +177,29 @@ if __name__ == '__main__':
             env_process, env_folder = start_environment(env_name=cfg.env_name)
             client, old_posit, initZ = connect_drone()
             vx,vy,vz,angle = 0,0,0,0
+            drone_state = client.getMultirotorState()
             val = 1
             dataset = []
             count = 0
             ya = YawMode()
             to_record = False
-            yaw_rate = 25
-
+            yaw_rate = 10
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            org = (50, 50)
+            fontScale = 1
+            color = (255, 0, 0)
+            thickness = 2
+            # quat = drone_state.kinematics_estimated.orientation
             while True:
                 # client.moveByVelocityZAsync(0.01, 0, 0, 0.01)
                 # obs = getObservation(client)
-                image = get_MonocularImageRGB(client, name)
 
+                image = get_MonocularImageRGB(client, name)
+                image2 = image
+                # angle = getEuler(quat)
+                text = str(angle)
+                # image = cv2.putText(image, text, org, font, 
+                #                 fontScale, color, thickness, cv2.LINE_AA)
                 count+=1
                 cv2.imshow('a', image)
                 k  = cv2.waitKey(1)
@@ -192,8 +209,8 @@ if __name__ == '__main__':
                     if count%10==0:
                         # to save
                         imname = 'img' + str(count//10) + '.jpg'
-                        cv2.imwrite('dataset/'+imname,image)
-                        dic = [vx,vy,vz,angle]
+                        cv2.imwrite('dataset/'+imname,image2)
+                        dic = [vx,vy,vz,ya.yaw_or_rate]
                         dataset.append(dic)
 
                 # time.sleep(0.5)
@@ -237,17 +254,18 @@ if __name__ == '__main__':
                     # client.moveByVelocityAsync(0.0, val, 0.0,  1)
                 elif k == ord('e'):
                     # degrees = 20
-                    ya.is_rate = False
+                    ya.is_rate = True
                     ya.yaw_or_rate+=yaw_rate
                     client.moveByVelocityAsync(vx, vy, 0.0,  1, drivetrain=0,yaw_mode=ya)
-                    angle+=yaw_rate
+                    # angle+=ya.yaw_or_rate
                 elif k == ord('q'):
                     # angle-=20
-                    ya.is_rate = False
+                    ya.is_rate = True
                     ya.yaw_or_rate-=yaw_rate
                     client.moveByVelocityAsync(0.0, 0.0, 0.0,  1, drivetrain=0,yaw_mode=ya)
-                    angle+=yaw_rate
-
+                    # angle-=ya.yaw_or_rate
+                angle-=ya.yaw_or_rate*2*3.14/180
+                angle = angle%360
         except Exception as e:
 
             print(e)
