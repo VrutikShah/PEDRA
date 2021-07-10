@@ -4,6 +4,7 @@
 *.xml
 *.jpg
 *.png
+*.zip
 .idea/
 models/
 unreal_envs/*/
