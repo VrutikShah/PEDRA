@@ -176,17 +176,19 @@ if __name__ == '__main__':
 
     if can_proceed:
         # Start the environment
+        to_record = False
+        dataset = []
         try:
             env_process, env_folder = start_environment(env_name=cfg.env_name)
             client, old_posit, initZ = connect_drone()
             vx,vy,vz,angle = 0,0,0,0
             drone_state = client.getMultirotorState()
             val = 1
-            dataset = []
+            
             count = 0
             ya = YawMode()
             ya.is_rate = True
-            to_record = False
+            
             yaw_rate = 15
             font = cv2.FONT_HERSHEY_SIMPLEX
             org = (50, 50)
